@@ -18,8 +18,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-
-from result_anlysis_tools.Count_Lines import count_lines
+from tools_usr.Count_Lines import count_lines
  
 def get_args_parser():
     parser = argparse.ArgumentParser('Set parameters for P2PNet evaluation', add_help=False)
@@ -31,7 +30,7 @@ def get_args_parser():
                         help="row number of anchor points")
     parser.add_argument('--line', default=2, type=int,
                         help="line number of anchor points")
-    parser.add_argument('--output_dir', default=r'pre_result',
+    parser.add_argument('--output_dir', default='output/pre_result',
                         help='path where to save')
     parser.add_argument('--weight_path', default=r'ckpt\best_mae.pth',
                         help='path where the trained weights saved')
@@ -56,7 +55,7 @@ def main(args, debug=False):
         standard_transforms.ToTensor(), 
         standard_transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),])
     
-    with open("./pre_gd_cnt.txt", 'w') as file:
+    with open("./output/pre_gd_cnt.txt", 'w') as file:
         for i in os.listdir(args.test_data):
             if i.endswith(".jpg"):
                 jpg_name = os.path.basename(i).split(".")[0]
@@ -104,6 +103,8 @@ def main(args, debug=False):
                 for p in points:
                     img_to_draw = cv2.circle(img_to_draw, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
                 # save the visualized image
+                if not os.path.exists(args.output_dir):
+                    os.makedirs(args.output_dir)
                 cv2.imwrite(os.path.join(args.output_dir, f'{jpg_name}_pred_{predict_cnt}.jpg'), img_to_draw)
 
 

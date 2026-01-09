@@ -9,20 +9,7 @@ __pycache__/
 crowd_datasets/pest/
 crowd_datasets/SHHA/
 output/
-output/
-# 忽略的目录及其所有子目录和文件
-pre_gd_cnt.txt   # 后处理产生的文件
-crowd_datasets/SHHA/test.list 
-crowd_datasets/SHHA/train.list
-crowd_datasets/SHHA/train_val_test/   # 训练集和验证的图片和注释比例划分文件
-crowd_datasets/SHHA/train/  #train的图片和注释
-crowd_datasets/SHHA/test/  #test的图片和注释
-crowd_datasets/SHHA/test/
-crowd_datasets/SHHA/val_real_test/
-crowd_datasets/SHHA/train/
-pre_result/
+log/
 runs/
 ckpt/
 weights/
-crowd_datasets\pest\
-crowd_datasets\SHHA\

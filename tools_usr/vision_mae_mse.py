@@ -2,7 +2,7 @@ import re
 import matplotlib.pyplot as plt
 # ok
 
-log_file_path = r'log\run_log.txt'  # 读取日志文件
+log_file_path = 'log/run_log.txt'  # 读取日志文件
 metrics = {'mae': [], 'mse': []}# 初始化字典来存储指标数据
 metric_pattern = re.compile(r'metric/(mae|mse)@(\d+): ([\d.]+)')# 正则表达式用于匹配日志中的指标
 with open(log_file_path, 'r') as file:
@@ -23,7 +23,7 @@ plt.title('MAE over Epochs')
 plt.legend()
 plt.grid(True)
 # plt.show()
-plt.savefig('mae_over_epochs.png')  # 保存MAE图表
+plt.savefig('log/mae_over_epochs.png')  # 保存MAE图表
 plt.figure(figsize=(10, 5))
 plt.plot(epochs, metrics['mse'], label='MSE', marker='o', color='red')
 plt.xlabel('Epoch')
@@ -32,4 +32,4 @@ plt.title('MSE over Epochs')
 plt.legend()
 plt.grid(True)
 #plt.show()
-plt.savefig('mse_over_epochs.png')  # 保存MAE图表
+plt.savefig('log/mse_over_epochs.png')  # 保存MAE图表

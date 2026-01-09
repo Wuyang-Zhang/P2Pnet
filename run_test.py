@@ -21,13 +21,14 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Set parameters for P2PNet evaluation', add_help=False)
     
     # * Backbone
+    parser.add_argument('--img_path', default='crowd_datasets/SHHA/val_real_test/001_002678.jpg', type=str, help='path to the image')
     parser.add_argument('--backbone', default='vgg16_bn', type=str,
                         help="name of the convolutional backbone to use")
     parser.add_argument('--row', default=2, type=int,
                         help="row number of anchor points")
     parser.add_argument('--line', default=2, type=int,
                         help="line number of anchor points")
-    parser.add_argument('--output_dir', default=r'pre_result',
+    parser.add_argument('--output_dir', default='output/pre_result',
                         help='path where to save')
     parser.add_argument('--weight_path', default=r'ckpt\best_mae.pth',
                         help='path where the trained weights saved')
@@ -38,10 +39,11 @@ def get_args_parser():
 
 def main(args, debug=False):
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = '{}'.format(args.gpu_id)
+    # Set CUDA_VISIBLE_DEVICES before creating device
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
 
     print(args)
-    device = torch.device('cuda')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # get the P2PNet
     model = build_model(args)
     # move to GPU
@@ -59,7 +61,7 @@ def main(args, debug=False):
     ])
 
     # set your image path here
-    img_path = r"crowd_datasets\SHHA\val_real_test\001_002678.jpg"
+    img_path = args.img_path
     # load the images
     img_raw = Image.open(img_path).convert('RGB')
     # round the size
@@ -91,9 +93,11 @@ def main(args, debug=False):
     for p in points:
         img_to_draw = cv2.circle(img_to_draw, (int(p[0]), int(p[1])), size, (0, 0, 255), -1)
     # save the visualized image
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
     cv2.imwrite(os.path.join(args.output_dir, 'pred{}.jpg'.format(predict_cnt)), img_to_draw)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('P2PNet evaluation script', parents=[get_args_parser()])
-    args = parser.parse_args()
+
+    args = get_args_parser().parse_args()
     main(args)

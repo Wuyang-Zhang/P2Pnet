@@ -9,6 +9,8 @@ conda create -n p2pnet38 python=3.8 -y
 conda activate p2pnet38
 conda install pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia -y
 pip install -r requirements.txt
+
+pip install scikit-learn
 ```
 
 ## Dataset creation.
@@ -51,18 +53,27 @@ python crowd_datasets/dataset_tools/create_list.py
 python train.py
 ```
 
+对log里面的指标进行训练过程中可视化处理：
+
+```bash
+python  visualize_training_metrics.py
+python tools_usr/vision_mae_mse.py  # 功能同上
+```
+
+
+
 ## Test
 
 对单个图片进行验证
 
-```
-python run_test.py
+```bash
+python run_test.py --img_path "crowd_datasets/SHHA/test/img_0042_726071616.jpg" --weight_path ckpt/best_mae.pth 
 ```
 
 对文件进行检测 
 
 ```bash
-python run_test_processfor_folder.py 
+python run_test_processfor_folder.py  --test_data "crowd_datasets/SHHA/test" --output_dir 'output/pre_result'  --weight_path ckpt/best_mae.pth
 ```
 
 一定要注意,这种插值方法会出问题
@@ -88,10 +99,7 @@ new_height = height // 128 * 128
 
 ## metrics
 
- 计算mae
-
 ```bash
-python result_anlysis_tools/calculate_mae.py 
+python  tools_usr/calculate_metric.py
 ```
 
-输出pre_gd_cnt.txt
