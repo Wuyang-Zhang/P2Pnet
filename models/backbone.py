@@ -8,7 +8,13 @@ import torch
 import torch.nn.functional as F
 import torchvision
 from torch import nn
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.abspath(os.path.join(current_dir, '..'))
+import sys
+sys.path.append(root_dir)
+print(sys.path)
 import models.vgg_ as models
 
 class BackboneBase_VGG(nn.Module):

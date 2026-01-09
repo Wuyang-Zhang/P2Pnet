@@ -31,7 +31,7 @@ class RegressionModel(nn.Module):
 
         self.output = nn.Conv2d(feature_size, num_anchor_points * 2, kernel_size=3, padding=1)
     # sub-branch forward
-    def forward(self, x):
+    def forward(self, x):  # 输入：FPN 输出的单层级特征（如 P4_x），维度 (B, 256, H/8, W/8)
         out = self.conv1(x)
         out = self.act1(out)
 
@@ -42,7 +42,7 @@ class RegressionModel(nn.Module):
 
         out = out.permute(0, 2, 3, 1)
 
-        return out.contiguous().view(out.shape[0], -1, 2)
+        return out.contiguous().view(out.shape[0], -1, 2)  # 输出：偏移量预测，维度 (B, N_anchor, 2) N_anchor：当前层级的参考点总数（row×line×(H/8 × W/8)） 2 表示 x、y 方向的偏移量
 
 # the network frmawork of the classification branch
 class ClassificationModel(nn.Module):
@@ -66,8 +66,10 @@ class ClassificationModel(nn.Module):
 
         self.output = nn.Conv2d(feature_size, num_anchor_points * num_classes, kernel_size=3, padding=1)
         self.output_act = nn.Sigmoid()
+
+
     # sub-branch forward
-    def forward(self, x):
+    def forward(self, x): # 输入：同回归分支，(B, 256, H/8, W/8)
         out = self.conv1(x)
         out = self.act1(out)
 
@@ -82,7 +84,7 @@ class ClassificationModel(nn.Module):
 
         out2 = out1.view(batch_size, width, height, self.num_anchor_points, self.num_classes)
 
-        return out2.contiguous().view(x.shape[0], -1, self.num_classes)
+        return out2.contiguous().view(x.shape[0], -1, self.num_classes) # 输出：类别概率预测，维度 (B, N_anchor, num_classes)
 
 # generate the reference points in grid layout
 def generate_anchor_points(stride=16, row=3, line=3):
@@ -99,20 +101,33 @@ def generate_anchor_points(stride=16, row=3, line=3):
     )).transpose()
 
     return anchor_points
+
+# 空间复制：通过 shift 函数将单个网格的基础参考点复制到全图所有网格，形成覆盖图像的参考点集合
 # shift the meta-anchor to get an acnhor points
 def shift(shape, stride, anchor_points):
-    shift_x = (np.arange(0, shape[1]) + 0.5) * stride
-    shift_y = (np.arange(0, shape[0]) + 0.5) * stride
 
-    shift_x, shift_y = np.meshgrid(shift_x, shift_y)
+    # *  stride：从 “特征图网格坐标” 映射到 “输入图像像素坐标”
+    shift_x = (np.arange(0, shape[1]) + 0.5) * stride # 生成所有网格的中心坐标（x方向） # shape[1]是特征图宽度（网格数量）
+    shift_y = (np.arange(0, shape[0]) + 0.5) * stride  # 生成所有网格的中心坐标（y方向） shape[0]是特征图高度（网格数量）
 
+    shift_x, shift_y = np.meshgrid(shift_x, shift_y) # 生成网格中心坐标的网格矩阵（x和y的所有组合）
+
+
+    #  # 将网格中心坐标转换为 (K, 2) 格式（K是网格总数）
     shifts = np.vstack((
         shift_x.ravel(), shift_y.ravel()
-    )).transpose()
+    )).transpose()  #  # 形状：(K, 2)，K = 特征图高 × 特征图宽
 
-    A = anchor_points.shape[0]
-    K = shifts.shape[0]
+    A = anchor_points.shape[0]   # 单个网格内的参考点数量（row×line）
+    K = shifts.shape[0] # 网格总数
+
+    # 复制基础参考点到每个网格：
+    # 1. 将基础参考点从 (A, 2) 扩展为 (1, A, 2)
+    # 2. 将网格中心从 (K, 2) 扩展为 (K, 1, 2)
+    # 3. 相加后得到 (K, A, 2)，即每个网格的A个参考点
     all_anchor_points = (anchor_points.reshape((1, A, 2)) + shifts.reshape((1, K, 2)).transpose((1, 0, 2)))
+
+    # 展平为 (K×A, 2)，即所有参考点的坐标
     all_anchor_points = all_anchor_points.reshape((K * A, 2))
 
     return all_anchor_points
@@ -122,30 +137,40 @@ class AnchorPoints(nn.Module):
     def __init__(self, pyramid_levels=None, strides=None, row=3, line=3):
         super(AnchorPoints, self).__init__()
 
+        #  金字塔层级（默认 [3,4,5,6,7]，对应不同尺度的特征图）
+        # 如层级 3 对应输入图像下采样 8 倍的特征图，层级 4 对应下采样 16 倍，以此类推
         if pyramid_levels is None:
             self.pyramid_levels = [3, 4, 5, 6, 7]
         else:
             self.pyramid_levels = pyramid_levels
 
+
+        #  # 每个层级的步长（stride），默认 2^p（p 为层级）；
+        # 特征图上 1 个像素对应输入图像的像素数（如层级 3 的 stride=8，即特征图 1 像素 = 输入图像 8×8 像素；
         if strides is None:
             self.strides = [2 ** x for x in self.pyramid_levels]
 
-        self.row = row
-        self.line = line
+        #  # 每个网格内沿高度（row）和宽度（line）方向的参考点数量
+        self.row = row  #  # 高度方向的点数
+        self.line = line  # 宽度方向的点数
 
-    def forward(self, image):
-        image_shape = image.shape[2:]
+    def forward(self, image):  # (B, 3, H, W)
+        image_shape = image.shape[2:]  # 输入图像的高和宽 (H, W)
         image_shape = np.array(image_shape)
-        image_shapes = [(image_shape + 2 ** x - 1) // (2 ** x) for x in self.pyramid_levels]
+        # 例如：输入图像 H=640，层级 3（2^3=8）的特征图高度为 (640 + 8 - 1) // 8 = 80
+        image_shapes = [(image_shape + 2 ** x - 1) // (2 ** x) for x in self.pyramid_levels] # 计算每个金字塔层级对应的特征图尺寸（向上取整）确保特征图尺寸不会因整除问题偏小
 
-        all_anchor_points = np.zeros((0, 2)).astype(np.float32)
+        all_anchor_points = np.zeros((0, 2)).astype(np.float32)  # 存储所有层级的参考点
         # get reference points for each level
         for idx, p in enumerate(self.pyramid_levels):
-            anchor_points = generate_anchor_points(2**p, row=self.row, line=self.line)
-            shifted_anchor_points = shift(image_shapes[idx], self.strides[idx], anchor_points)
-            all_anchor_points = np.append(all_anchor_points, shifted_anchor_points, axis=0)
+            anchor_points = generate_anchor_points(2**p, row=self.row, line=self.line)  # 步骤2.1：生成单个网格内的基础参考点（meta-anchor）
+            shifted_anchor_points = shift(image_shapes[idx], self.strides[idx], anchor_points)  # 步骤2.2：将基础参考点复制到特征图的每个网格，生成全图参考点
+            all_anchor_points = np.append(all_anchor_points, shifted_anchor_points, axis=0) # 步骤2.3：拼接当前层级的参考点到总列表
 
-        all_anchor_points = np.expand_dims(all_anchor_points, axis=0)
+
+        # N_anchor：所有层级的参考点总数，由 row、line 和金字塔层级决定（默认层级为 [3]）；
+        # 若 row=2、line=2，单层级参考点数量为 2×2×(H/8 × W/8)（因层级 3 对应 stride=8），最终 N_anchor 为该值；
+        all_anchor_points = np.expand_dims(all_anchor_points, axis=0)  # (B, N_anchor, 2)
         # send reference points to device
         if torch.cuda.is_available():
             return torch.from_numpy(all_anchor_points.astype(np.float32)).cuda()
@@ -173,18 +198,23 @@ class Decoder(nn.Module):
 
 
     def forward(self, inputs):
+
+
+        # C3：(B, 256, H/4, W/4)；
+        # C4：(B, 512, H/8, W/8)；
+        # C5：(B, 512, H/16, W/16)
         C3, C4, C5 = inputs
 
         P5_x = self.P5_1(C5)
         P5_upsampled_x = self.P5_upsampled(P5_x)
-        P5_x = self.P5_2(P5_x)
+        P5_x = self.P5_2(P5_x)   # P5_x：(B, 256, H/16, W/16)
 
         P4_x = self.P4_1(C4)  # P4_x--->torch.Size([1, 256, 189, 240])
         P4_x = P5_upsampled_x + P4_x  # P5_upsampled_x--->torch.Size([1, 256, 188, 240])
-        P4_upsampled_x = self.P4_upsampled(P4_x)
-        P4_x = self.P4_2(P4_x)
+        P4_upsampled_x = self.P4_upsampled(P4_x)   
+        P4_x = self.P4_2(P4_x)  # P4_x：(B, 256, H/8, W/8)
 
-        P3_x = self.P3_1(C3)
+        P3_x = self.P3_1(C3)  # P3_x：(B, 256, H/4, W/4)
         P3_x = P3_x + P4_upsampled_x
         P3_x = self.P3_2(P3_x)
 
@@ -218,13 +248,21 @@ class P2PNet(nn.Module):
         # run the regression and classification branch
         regression = self.regression(features_fpn[1]) * 100 # 8x
         classification = self.classification(features_fpn[1])
-        anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)
+
+        # 生成参考点（初始形状：(1, N_anchor, 2)，N_anchor是所有参考点总数）
+        # 复制到batch中的每个样本：repeat(batch_size, 1, 1) 保持参考点坐标不变，仅扩展batch维度；
+        # 批次复制：通过 repeat 方法将参考点集合复制到批次中的每个样本，确保批量处理时参考点位置一致；
+        anchor_points = self.anchor_points(samples).repeat(batch_size, 1, 1)    # 形状变为 (B, N_anchor, 2)
         # decode the points as prediction
         output_coord = regression + anchor_points
         output_class = classification
-        out = {'pred_logits': output_class, 'pred_points': output_coord}
+        out = {'pred_logits': output_class, # pred_logits：分类预测，维度 (B, N_anchor, 2)
+                'pred_points': output_coord} # pred_points：最终点坐标（参考点 + 偏移量），维度 (B, N_anchor, 2)
        
         return out
+    
+
+
 
 class SetCriterion_Crowd(nn.Module):
 

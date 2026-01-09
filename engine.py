@@ -92,13 +92,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
 
-        # reduce all losses
-        loss_dict_reduced = utils.reduce_dict(loss_dict)
+        # reduce all losses  是对模型计算出的各类损失（loss）进行汇总、缩放和最终求值，通常用于训练过程中整合不同类型的损失（如分类损失、回归损失等），以便反向传播更新模型参数
+        loss_dict_reduced = utils.reduce_dict(loss_dict) # 对分布式训练中的损失进行 “归约”（reduce），确保多卡训练时损失值在各设备间同步
         loss_dict_reduced_unscaled = {f'{k}_unscaled': v
                                       for k, v in loss_dict_reduced.items()}
         loss_dict_reduced_scaled = {k: v * weight_dict[k]
-                                    for k, v in loss_dict_reduced.items() if k in weight_dict}
-        losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
+                                    for k, v in loss_dict_reduced.items() if k in weight_dict} # 对各类损失按预设权重进行缩放（加权），平衡不同损失的贡献
+        losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())  # 将所有加权后的损失求和，得到最终用于反向传播的总损失
 
         loss_value = losses_reduced_scaled.item()
 

@@ -17,8 +17,8 @@ def generate_file_paths(input_txt_path, output_txt_path, img_folder, txt_folder)
             output_file.write(f"{img_path} {txt_path}\n")
 
 if __name__ == "__main__":
-    input_txt_path = r"crowd_datasets\SHHA\train_val_test\val.txt"     # floder train  <--- train.txt  |  floder test <--- val.txt 
-    output_txt_path = r"crowd_datasets\SHHA\test.txt"  
-    img_folder = r'crowd_datasets\SHHA\train' 
-    txt_folder = r'crowd_datasets\SHHA\train' 
+    input_txt_path = "crowd_datasets/SHHA/train_val_test/val.txt"     # floder train  <--- train.txt  |  floder test <--- val.txt 
+    output_txt_path = "crowd_datasets/SHHA/test.txt"  
+    img_folder = "crowd_datasets/SHHA/val" 
+    txt_folder = "crowd_datasets/SHHA/val" 
     generate_file_paths(input_txt_path, output_txt_path, img_folder, txt_folder)
