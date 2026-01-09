@@ -1,7 +1,14 @@
 # 忽略临时文件
 *.tmp
+__pychache__
+# 忽略所有 .pyc 编译文件（.pyc 是 Python 运行后生成的字节码文件）
+*.pyc
+# 忽略所有 __pycache__ 目录（Python 存放编译文件的缓存目录）
+__pycache__/
+**/__pychache__
 crowd_datasets/pest/
 crowd_datasets/SHHA/
+output/
 output/
 # 忽略的目录及其所有子目录和文件
 pre_gd_cnt.txt   # 后处理产生的文件
